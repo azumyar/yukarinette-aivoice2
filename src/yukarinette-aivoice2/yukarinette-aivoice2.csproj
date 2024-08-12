@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net48</TargetFramework>
+		<RootNamespace>Yarukizero.Net.Yularinette.AiVoice2</RootNamespace>
+		<LangVersion>10</LangVersion>
+		<VersionPrefix>0.10.1</VersionPrefix>
+		<UseWPF>true</UseWPF>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)'=='Release'">
+		<DebugType>none</DebugType>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="Resources\ai-notfound.wav" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <EmbeddedResource Include="Resources\ai-notfound.wav" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Reference Include="PresentationCore" />
+		<Reference Include="PresentationFramework" />
+		<Reference Include="System.Windows" />
+		<Reference Include="System.Windows.Presentation" />
+		<Reference Include="WindowsBase" />
+		<Reference Include="YukarinetteInterface">
+			<HintPath>Lib\YukarinetteInterface.dll</HintPath>
+		</Reference>
+	</ItemGroup>
+</Project>
