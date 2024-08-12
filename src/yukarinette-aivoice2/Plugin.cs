@@ -7,7 +7,7 @@ using System.Windows.Media.Imaging;
 
 namespace Yarukizero.Net.Yularinette.AiVoice2 {
 	public class Plugin : IYukarinetteInterface {
-		public override string Name { get; } = "AI.VOICE2 メッセージ連携";
+		public override string Name { get; } = "A.I.VOICE2 メッセージ連携";
 		//public override System.Windows.Media.ImageSource Icon => icon;
 
 		private Connect con = null;

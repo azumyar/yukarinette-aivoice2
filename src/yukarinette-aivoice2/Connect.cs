@@ -80,21 +80,7 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			public int right;
 			public int bottom;
 		}
-
-		private delegate bool HookVoicePeakProc(IntPtr hwnd);
-		private delegate bool UnhookVoicePeakProc(IntPtr hwnd);
-
-		private const int VPC_MSG_CALLBACKWND = 1;
-		private const int VPC_MSG_ENABLEHOOK = 2;
-		private const int VPC_MSG_ENDSPEECH = 3;
-		private const int VPC_MSG_ENABLEHOOK2 = 4;
-		private const int VPC_HOOK_ENABLE = 1;
-		private const int VPC_HOOK_DISABLE = 0;
-
-		private const int WM_USER = 0x400;
-		private const int VPCM_ENDSPEECH = (WM_USER + VPC_MSG_ENDSPEECH);
-		private readonly string VpConnectMessage = "yarukizero-vp-connect";
-		private readonly string MapNameHokk2 = "yarukizero-vp-connect.hook2";
+		private readonly string MapNameCapture = "yarukizero-net-yukarinette.audio-capture";
 
 		class MessageWindow : System.Windows.Window {
 			private readonly Connect con;
@@ -119,11 +105,9 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			}
 
 			private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) {
-				if(msg == VPCM_ENDSPEECH) {
-					this.con.sync.Set();
-					handled = true;
-				}
-				if(msg == YACM_CAPTURE) {
+				if(msg == YACM_STARTUP) {
+					this.con.captureWindow = lParam;
+				} else if(msg == YACM_CAPTURE) {
 					this.con.sync.Set();
 					handled = true;
 				}
@@ -137,10 +121,6 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 		private MessageWindow window;
 		private IntPtr formHandle;
 
-		private IntPtr hHookModule;
-		private HookVoicePeakProc hookFunc;
-		private UnhookVoicePeakProc unhookFunc;
-
 		private IntPtr hAiVoice;
 		private int voicePeakWidth;
 
@@ -150,6 +130,7 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 		private readonly int defaultWaitSec = 50;
 
 		private Process captureProcess;
+		private nint captureWindow;
 		private const int WM_APP = 0x8000;
 		private const int YACM_STARTUP = WM_APP + 1;
 		private const int YACM_SHUTDOWN = WM_APP + 2;
@@ -157,7 +138,6 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 		private const int YACM_CAPTURE = WM_APP + 5;
 
 		public Connect() {
-			this.connectionMsg = RegisterWindowMessage(VpConnectMessage);
 			this.exePath = Path.Combine(
 				AppDomain.CurrentDomain.BaseDirectory,
 				"Plugins",
@@ -179,10 +159,7 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 		}
 
 		public bool BeginCapture() {
-			if(this.captureProcess == null) {
-				this.captureProcess = Process.Start(this.exePath);
-			}
-			return this.captureProcess != null;
+			return true;
 		}
 
 		public bool BeginAiVoice() {
@@ -205,18 +182,24 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			this.voicePeakWidth = rc.right - rc.left;
 			// キーボードフォーカス握るウインドウに差し替え
 			this.hAiVoice = FindWindowEx(p.MainWindowHandle, 0, "FLUTTERVIEW", "FLUTTERVIEW");
-			
-			PostMessage(
-				this.captureProcess.MainWindowHandle,
-				YACM_STARTUP,
-				p.Id,
-				this.formHandle);
+
+			if(this.captureProcess == null) {
+				var hMapObj = CreateFileMapping(
+					(IntPtr)(-1), IntPtr.Zero, PAGE_READWRITE,
+					0, 8 * 2,
+					MapNameCapture);
+				var ptr = MapViewOfFile(hMapObj, FILE_MAP_WRITE, 0, 0, IntPtr.Zero);
+				Marshal.WriteIntPtr(ptr, 0, (IntPtr)p.Id);
+				Marshal.WriteIntPtr(ptr, 8, this.window.Handle);
+				UnmapViewOfFile(ptr);
+				this.captureProcess = Process.Start(this.exePath);
+			}
 			return true;
 		}
 
 		public void EndCaptureAiVoice() {
 			if(this.captureProcess != null) {
-				PostMessage(this.captureProcess.MainWindowHandle, YACM_SHUTDOWN, 0, 0);
+				PostMessage(this.captureWindow, YACM_SHUTDOWN, 0, 0);
 				this.captureProcess.Dispose();
 				this.captureProcess = null;
 			}
@@ -238,7 +221,7 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			// キャプチャ待機
 			this.sync.Reset();
 			PostMessage(
-				this.captureProcess.MainWindowHandle,
+				this.captureWindow,
 				YACM_CAPTURE,
 				0,
 				0);
