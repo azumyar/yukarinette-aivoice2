@@ -1,5 +1,5 @@
 # yukarinette-aivoice2
-ゆかりねっととAI.VOICE2を連携します
+ゆかりねっととA.I.VOICE2を連携します
 
 
 ## インストール
@@ -8,8 +8,8 @@
 
 
 ## 使い方
-あらかじめAI.VOICE2 Editorを起動してゆかりねっとでしゃべりたいキャラクターと音声効果などのパラメータを設定してください。そのエディタ上にゆかりねっとから操作を行います。ゆかりねっと使用中はAI.VOICE2を操作しないでください。
+あらかじめA.I.VOICE2 Editorを起動してゆかりねっとでしゃべりたいキャラクターと音声効果などのパラメータを設定してください。そのエディタ上にゆかりねっとから操作を行います。ゆかりねっと使用中はA.I.VOICE2を操作しないでください。
 
 ![](doc/aivoice2.png)
 
-[voicepeak-connect](https://github.com/azumyar/voicepeak-connect)と異なりAI.VOICE2 Editorの画面はウインドウの下に隠れていても問題ありません。
+[voicepeak-connect](https://github.com/azumyar/voicepeak-connect)と異なりA.I.VOICE2 Editorの画面はウインドウの下に隠れていても問題ありません。
