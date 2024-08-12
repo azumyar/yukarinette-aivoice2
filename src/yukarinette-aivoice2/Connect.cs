@@ -1,5 +1,3 @@
-using FlaUI.Core.AutomationElements;
-using FlaUI.UIA3;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -12,9 +10,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows.Interop;
 
 namespace Yarukizero.Net.Yularinette.AiVoice2 {
 	internal class Connect : IDisposable {
