@@ -35,6 +35,8 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
 		private static extern int GetPrivateProfileInt(string lpAppName, string lpKeyName, int nDefault, string lpFileName);
+		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+		private static extern int GetPrivateProfileString(string lpAppName, string lpKeyName, string lpDefault, StringBuilder lpReturnedString, int nSize, string lpFileName);
 
 		[DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
 		private static extern nint CreateFileMapping(nint hFile, nint lpFileMappingAttributes, int flProtect, int dwMaximumSizeHigh, int dwMaximumSizeLow, string lpName);
@@ -52,6 +54,11 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			nint hWndChildAfter,
 			string lpszClass,
 			string lpszWindow);
+		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+		private static extern int GetClassName(nint hWnd, StringBuilder lpClassName, int nMaxCount);
+		[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+		private static extern bool EnumThreadWindows(int dwThreadId, EnumThreadWndProc lpfn, nint lParam);
+		delegate bool EnumThreadWndProc(nint hwnd, nint lParam);
 
 		private const int WM_KILLFOCUS = 0x0008; 
 		private const int WM_LBUTTONDOWN = 0x201;
@@ -80,7 +87,9 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			public int right;
 			public int bottom;
 		}
+		private readonly string AiVoiceWindowsClass = "FLUTTER_RUNNER_WIN32_WINDOW";
 		private readonly string MapNameCapture = "yarukizero-net-yukarinette.audio-capture";
+		private readonly string DefaultAiVoicePath = @"C:\Program Files\AI\AIVoice2\AIVoice2Editor\aivoice.exe";
 
 		class MessageWindow : System.Windows.Window {
 			private readonly Connect con;
@@ -119,9 +128,9 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 
 		private int connectionMsg;
 		private MessageWindow window;
-		private IntPtr formHandle;
+		private nint formHandle;
 
-		private IntPtr hAiVoice;
+		private nint hAiVoice;
 		private int voicePeakWidth;
 
 		private readonly string dllPath;
@@ -171,17 +180,54 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 					return false;
 				}
 			}).FirstOrDefault();
+			this.hAiVoice = p?.MainWindowHandle ?? IntPtr.Zero;
 			if(p == null) {
+				// 起動していなかったら起動する
+				var path = new StringBuilder(260);
+				GetPrivateProfileString(
+					"plugin",
+					"app",
+					this.DefaultAiVoicePath,
+					path,
+					path.Capacity,
+					this.iniPath);
+				if(File.Exists(path.ToString())) {
+					try {
+						p = Process.Start(path.ToString());
+						p.WaitForInputIdle();
+						// 自分で起動したプロセスはMainWindowHandleが必ず(？)空なので自分でとりに行く
+						var l = new List<ProcessThread>();
+						foreach(ProcessThread thread in p.Threads) {
+							l.Add(thread);
+						}
+						if(l.OrderBy(x => x.StartTime).FirstOrDefault() is ProcessThread pt) {
+							EnumThreadWindows(pt.Id, (hwnd, lP) => {
+								var s = new StringBuilder(128);
+								if((GetClassName(hwnd, s, s.Capacity) != 0)
+									&& (s.ToString() == AiVoiceWindowsClass)) {
+
+									this.hAiVoice = hwnd;
+									return false;
+								}
+								return true;
+							}, 0);
+						}
+					}
+					catch(Exception e) when((e is Win32Exception) || (e is InvalidOperationException)) {
+						return false;
+					}
+				} else {
+					return false;
+				}
+			}
+			if(this.hAiVoice == 0) {
 				return false;
 			}
-			
-			this.hAiVoice = p.MainWindowHandle;
+
 			GetWindowRect(this.hAiVoice, out var rc);
 			SetWindowPos(this.hAiVoice, IntPtr.Zero, rc.left, rc.top, 1152, 720, 0);
 			GetClientRect(this.hAiVoice, out rc);
 			this.voicePeakWidth = rc.right - rc.left;
-			// キーボードフォーカス握るウインドウに差し替え
-			this.hAiVoice = FindWindowEx(p.MainWindowHandle, 0, "FLUTTERVIEW", "FLUTTERVIEW");
 
 			if(this.captureProcess == null) {
 				var hMapObj = CreateFileMapping(
@@ -217,6 +263,8 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 				PostMessage(hwnd, WM_KEYUP, (IntPtr)keycode, (IntPtr)0xC00000001);
 			}
 
+			// キーボードフォーカス握るウインドウに差し替え
+			var aivoiceTarget = FindWindowEx(this.hAiVoice, 0, "FLUTTERVIEW", "FLUTTERVIEW");
 
 			// キャプチャ待機
 			this.sync.Reset();
@@ -227,17 +275,17 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 				0);
 
 			// 文字入力
-			click(this.hAiVoice, 380, 185);
+			click(aivoiceTarget, 380, 185);
 			Thread.Sleep(100);
 			foreach(var c in text) {
 				int WM_CHAR = 0x0102;
-				SendMessage(this.hAiVoice, WM_CHAR, (IntPtr)c, IntPtr.Zero);
+				SendMessage(aivoiceTarget, WM_CHAR, (IntPtr)c, IntPtr.Zero);
 			}
 			// 逐次変換されるぽいので固定で1秒待つ
 			Thread.Sleep(1000);
 
 			// 再生
-			click(this.hAiVoice, 475, 45);
+			click(aivoiceTarget, 475, 45);
 			{
 				var waitSec = GetPrivateProfileInt(
 					"plugin",
@@ -248,14 +296,14 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			}
 
 			// 後片付け
-			click(this.hAiVoice, 380, 185);
+			click(aivoiceTarget, 380, 185);
 			Thread.Sleep(100);
 			if(!string.IsNullOrEmpty(text)) {
 				// 残ることがあるらしいので3週Deleteを打つ
 				for(var i = 0; i < 3; i++) {
-					keyboard(this.hAiVoice, VK_HOME);
+					keyboard(aivoiceTarget, VK_HOME);
 					foreach(var _ in text) {
-						keyboard(this.hAiVoice, VK_DELETE);
+						keyboard(aivoiceTarget, VK_DELETE);
 					}
 				}
 			}
