@@ -296,6 +296,8 @@ namespace Yarukizero.Net.Yularinette.AiVoice2 {
 			}
 
 			// 後片付け
+			// 再生終了直後はフォーカスが奪えないので少し待つ
+			Thread.Sleep(100);
 			click(aivoiceTarget, 380, 185);
 			Thread.Sleep(100);
 			if(!string.IsNullOrEmpty(text)) {
